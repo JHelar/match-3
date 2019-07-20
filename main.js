@@ -10,13 +10,21 @@ const colors = [
     'blue'
 ]
 
-const makeTile = (color, index, row, column) => {
+const getRandomType = () => colors[(Math.random() * 4) | 0]; 
+
+const makeTile = (type, index, row, column) => {
     const element = tileTemplate.content.cloneNode(true).querySelector('.tile');
-    element.dataset.tileType = color;
+    element.dataset.tileType = type;
     element.innerHTML = `${index}, (${row}, ${column})`;
     return {
         element,
-        color
+        set type(newType) {
+            type = newType;
+            element.dataset.tileType = newType;
+        },
+        get type() {
+            return type;
+        }
     }
 }
 
@@ -24,7 +32,7 @@ const makeNode = (row, column, index) => ({
     index,
     row,
     column,
-    tile: makeTile(colors[(Math.random() * 4) | 0], index, row, column),
+    tile: makeTile(getRandomType(), index, row, column),
 })
 
 
@@ -34,7 +42,7 @@ const printBoard = board => {
 
 const getNodeAt = (index, board) => board.reduce((node, nodeRow) => node || nodeRow.find(n => n.index === index), undefined)
 
-const isMatch = node => (matched, matchNode) => !matched || !matchNode ? false : matchNode.tile.color === node.tile.color;
+const isMatch = node => (matched, matchNode) => !matched || !matchNode ? false : matchNode.tile.type === node.tile.type;
 
 const getMatches = (node, board) => {
     const matches = []
@@ -82,13 +90,29 @@ const getMatches = (node, board) => {
     return matches;
 }
 
+const getClosestAboveNonEmptyNode = (node, board) => {
+    let nextNode = node.index && getNodeAt(node.index / GAME_SIZE, board) || undefined;
+    if(nextNode && nextNode.tile.type === 'empty') return getClosestAboveNonEmptyNode(nextNode);
+    else if(nextNode) {
+        return nextNode;
+    } else {
+        return undefined;
+    }
+}
+
+const matchBoard = board => {
+    board.forEach((nodeRow, rowIndex) => {
+        nodeRow.forEach((node, columnIndex) => {
+            const matches = getMatches(node, board);
+            matches.forEach(match => match.forEach(matchNode => matchNode.tile.type = 'empty'))
+        })
+    })
+}
+
+const dropNewTiles = board => {
+    
+}
+
 const board = Array(GAME_SIZE).fill(0).map((n, row) => Array(GAME_SIZE).fill(0).map((m, column) => makeNode(row, column, row * GAME_SIZE + column)))
 
 printBoard(board);
-
-board.forEach((nodeRow, rowIndex) => {
-    nodeRow.forEach((node, columnIndex) => {
-        const matches = getMatches(node, board);
-        matches.forEach(match => match.forEach(matchNode => matchNode.tile.element.dataset.tileType = 'empty'))
-    })
-})
