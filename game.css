@@ -1,0 +1,52 @@
+:root {
+    --game-size: 8;
+    --tile-size: 50px;
+
+    --tile-main-color: transparent;
+    --tile-secondary-color: transparent;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game {
+    display: grid;
+    grid-template-columns: repeat(var(--game-size), var(--tile-size));
+    grid-template-rows: repeat(var(--game-size), var(--tile-size));
+
+    border: 2px solid;
+}
+
+.tile {
+    display: block;
+    box-shadow: inset 0 0 10px 0px var(--tile-secondary-color);
+    background-color: var(--tile-main-color);
+    border: 1px solid var(--tile-secondary-color);
+}
+
+.tile[data-tile-type=red] {
+    --tile-main-color:red;
+    --tile-secondary-color: darkred;
+}
+
+.tile[data-tile-type=green] {
+    --tile-main-color: green;
+    --tile-secondary-color: darkgreen;
+}
+
+.tile[data-tile-type=yellow] {
+    --tile-main-color: yellow;
+    --tile-secondary-color: #b1b100;
+}
+
+.tile[data-tile-type=blue] {
+    --tile-main-color: blue;
+    --tile-secondary-color: darkblue;
+}
+
+.tile[data-tile-type=empty] {
+    opacity: 0;
+}
