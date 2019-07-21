@@ -18,45 +18,64 @@ const STATES = {
 }
 
 let STATE = STATES.MATCH;
+const DEBUG = false;
 
 const getRandomType = () => colors[(Math.random() * 4) | 0]; 
 
 const makeTile = (type, index, row, column) => {
     const element = tileTemplate.content.cloneNode(true).querySelector('.tile');
     element.dataset.tileType = type;
-    element.innerHTML = `${index}, (${row}, ${column})`;
+    element.innerHTML = DEBUG ? `${index}, (${column}, ${row})` : '';
+
+    element.style.setProperty('--y', `${row * TILE_SIZE}px`);
+    element.style.setProperty('--x', `${column * TILE_SIZE}px`)
+
+    let animate = false;
+    let animationDuration = (row + 1 / GAME_SIZE) * 1;
+
     return {
         element,
+        get animate(){
+            return animate;
+        },
+        set animate(shouldAnimate) {
+            if(shouldAnimate) {
+                element.style.transitionDuration = '.25s';
+            } else {
+                element.style.transitionDuration = '0s';
+            }
+            animate = shouldAnimate;
+        },
         set type(newType) {
             type = newType;
             element.dataset.tileType = newType;
         },
         get type() {
             return type;
-        }
-    }
-}
-
-const makeNode = (row, column, index) => {
-    const tile = makeTile(getRandomType(), index, row, column);
-
-    return {
-        index,
+        },
         get row(){
             return row;
         },
         set row(newRow) {
             row = newRow;
-            tile.element.style.setProperty('--y', newRow * TILE_SIZE);
+            element.style.setProperty('--y', `${newRow * TILE_SIZE}px`);
         },
         get column(){
             return column;
         },
         set column(newColumn) {
             column = newColumn;
-            tile.element.style.setProperty('--x', newColumn * TILE_SIZE);
+            element.style.setProperty('--x', `${newColumn * TILE_SIZE}px`);
         },
-        tile,
+    }
+}
+
+const makeNode = (row, column, index) => {
+    const tile = makeTile(getRandomType(), index, row, column);
+    
+    return {
+        index,
+        tile
     }
 }
 
@@ -73,8 +92,9 @@ const getMatches = (node, board) => {
     const matches = []
     // Horizontal
     // Check exit condition for row
-    if (node.column + 2 < GAME_SIZE) {
+    if (node.tile.column + 2 < GAME_SIZE) {
         const matchRow = [
+            node,
             getNodeAt(node.index + 1, board),
             getNodeAt(node.index + 2, board)
         ]
@@ -82,20 +102,21 @@ const getMatches = (node, board) => {
             const fourthNode = getNodeAt(node.index + 3, board);
             const fifthNode = getNodeAt(node.index + 4, board);
 
-            if (fourthNode && fourthNode.row === node.row && [...matchRow, fourthNode].reduce(isMatch(node), true)) {
+            if (fourthNode && fourthNode.tile.row === node.tile.row && [...matchRow, fourthNode].reduce(isMatch(node), true)) {
                 matchRow.push(fourthNode);
-                if (fifthNode && fifthNode.row === node.row && [...matchRow, fourthNode, fifthNode].reduce(isMatch(node), true)) {
+                if (fifthNode && fifthNode.tile.row === node.tile.row && [...matchRow, fifthNode].reduce(isMatch(node), true)) {
                     matchRow.push(fifthNode);
                 }
             }
 
-            matches.push([node, ...matchRow]);
+            matches.push(matchRow);
         }
     }
     // Vertical
     // Check exit condition for column
-    if(node.row + 2 < GAME_SIZE) {
+    if(node.tile.row + 2 < GAME_SIZE) {
         const matchColumn = [
+            node,
             getNodeAt(node.index + 1 * GAME_SIZE, board),
             getNodeAt(node.index + 2 * GAME_SIZE, board)
         ]
@@ -103,14 +124,14 @@ const getMatches = (node, board) => {
             const fourthNode = getNodeAt(node.index + 3 * GAME_SIZE, board);
             const fifthNode = getNodeAt(node.index + 4 * GAME_SIZE, board);
             
-            if (fourthNode && fourthNode.column === node.column && [...matchColumn, fourthNode].reduce(isMatch(node), true)) {
+            if (fourthNode && fourthNode.tile.column === node.tile.column && [...matchColumn, fourthNode].reduce(isMatch(node), true)) {
                 matchColumn.push(fourthNode);
-                if (fifthNode && fifthNode.column === node.column && [...matchColumn, fourthNode, fifthNode].reduce(isMatch(node), true)) {
+                if (fifthNode && fifthNode.tile.column === node.tile.column && [...matchColumn, fifthNode].reduce(isMatch(node), true)) {
                     matchColumn.push(fifthNode);
                 }
             }
 
-            matches.push([node, ...matchColumn]);
+            matches.push(matchColumn);
         }
     }
 
@@ -118,7 +139,7 @@ const getMatches = (node, board) => {
 }
 
 const getClosestAboveNonEmptyNode = (node, board) => {
-    let nextNode = node.index && getNodeAt(node.index - GAME_SIZE, board) || undefined;
+    let nextNode = getNodeAt(node.index - GAME_SIZE, board) || undefined;
     if(nextNode && nextNode.tile.type === 'empty') return getClosestAboveNonEmptyNode(nextNode, board);
     else if(nextNode) {
         return nextNode;
@@ -130,39 +151,48 @@ const getClosestAboveNonEmptyNode = (node, board) => {
 const iterateNodes = (board, cb) => board.forEach((nodeRow, rowIndex) => nodeRow.forEach((node, columnIndex) => cb(node, rowIndex, columnIndex)))
 
 const matchBoard = board => {
+    const matches = new Set();
     iterateNodes(board, node => {
-        const matches = getMatches(node, board);
-        matches.forEach(match => match.forEach(matchNode => matchNode.tile.type = 'empty'))    
+        getMatches(node, board).forEach(match => matches.add(match));
     })
+    matches.forEach(match => match.forEach(matchNode => matchNode.tile.type = 'empty'))    
 }
 
 const dropNewTiles = board => {
     // Reverse the board. Start from bottom row
-    iterateNodes([...board].reverse(), node => {
-        if(node.tile.type === 'empty') {
-            const newNode = getClosestAboveNonEmptyNode(node, board);
-            if(newNode) {
-                // Switch tile type and row
-                const newType = newNode.tile.type;
-                const newRow = newNode.row;
-                const newIndex = newNode.index;
-                const newColumn = newNode.column;
+    const boardCopy = [...board.map(column => [...column])];
+    while(true) {
+        let emptyCount = 0;
+        iterateNodes(boardCopy.reverse(), node => {
+            if(node.tile.type === 'empty') {
+                const newNode = getClosestAboveNonEmptyNode(node, board);
+                const originRow = node.tile.row;
+                node.tile.animate = false;
 
-                newNode.tile.type = node.tile.type;
-                newNode.row = node.row;
+                if(newNode) {
+                    const newType = newNode.tile.type;
 
-                node.tile.type = newType;
-                node.row = newRow;
-                
-            } else {
-                // Create a new type for tile
-                node.tile.type = getRandomType();
+                    newNode.tile.type = node.tile.type;
+                    node.tile.type = newType;
+                    node.tile.row = newNode.tile.row;
+                } else {
+                    node.tile.type = getRandomType();
+                    node.tile.row = (TILE_SIZE * -1) - TILE_SIZE * node.tile.row;
+                }
+
+                setTimeout(() => {
+                    node.tile.animate = true;
+                    node.tile.row = originRow;
+                }, 0);
+
+                emptyCount++;
             }
-        }
-    })
+        })
+        if(emptyCount === 0) break; 
+    }
 }
 
-const board = Array(GAME_SIZE).fill(0).map((n, column) => Array(GAME_SIZE).fill(0).map((m, row) => makeNode(row, column, column * GAME_SIZE + row)))
+const board = Array(GAME_SIZE).fill(0).map((n, row) => Array(GAME_SIZE).fill(0).map((m, column) => makeNode(row, column, row * GAME_SIZE + column)))
 
 printBoard(board);
 
