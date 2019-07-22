@@ -3,6 +3,7 @@ const tileTemplate = document.getElementById('tile');
 
 const GAME_SIZE = 8;
 const TILE_SIZE = 50;
+const FALLING_SPEED = 1;
 
 const colors = [
     'red',
@@ -14,10 +15,27 @@ const colors = [
 const STATES = {
     INPUT: 'INPUT',
     MATCH: 'MATCH',
-    DROP: 'DROP'
+    DROP: 'DROP',
+    DROPPING: 'DROPPING'
 }
 
-let STATE = STATES.MATCH;
+let state = (() => {
+    let current = STATES.MATCH;
+    return {
+        get current() {
+            return current;
+        },
+        set current(newState) {
+            if(DEBUG) {
+                console.log(`------------------------`);
+                console.log('OLD STATE: %s', current);
+                console.log('NEW STATE: %s', newState);
+                console.log(`------------------------`);
+            }
+            current = newState;
+        }
+    }
+})()
 const DEBUG = false;
 
 const getRandomType = () => colors[(Math.random() * 4) | 0]; 
@@ -31,16 +49,25 @@ const makeTile = (type, index, row, column) => {
     element.style.setProperty('--x', `${column * TILE_SIZE}px`)
 
     let animate = false;
-    let animationDuration = (row + 1 / GAME_SIZE) * 1;
+    let isAnimating = false;
+    let animationDuration = (row + 1 / GAME_SIZE) * FALLING_SPEED;
+    let selected = false;
+
+    element.addEventListener('click', () => {
+        selected = !selected;
+        element.dataset.tileSelected = selected ? 'true' : 'false';
+    })
 
     return {
         element,
+        isAnimating,
+        selected,
         get animate(){
             return animate;
         },
         set animate(shouldAnimate) {
             if(shouldAnimate) {
-                element.style.transitionDuration = '.25s';
+                element.style.transitionDuration = `${animationDuration}s`;
             } else {
                 element.style.transitionDuration = '0s';
             }
@@ -57,8 +84,13 @@ const makeTile = (type, index, row, column) => {
             return row;
         },
         set row(newRow) {
+            animationDuration = ((Math.abs(row - newRow) + 1) / GAME_SIZE) * FALLING_SPEED;
             row = newRow;
             element.style.setProperty('--y', `${newRow * TILE_SIZE}px`);
+            isAnimating = true;
+            setTimeout(() => {
+                isAnimating = false;
+            }, animationDuration);
         },
         get column(){
             return column;
@@ -154,8 +186,13 @@ const matchBoard = board => {
     const matches = new Set();
     iterateNodes(board, node => {
         getMatches(node, board).forEach(match => matches.add(match));
-    })
-    matches.forEach(match => match.forEach(matchNode => matchNode.tile.type = 'empty'))    
+    });
+
+    const hasMatches = matches.size > 0;
+
+    matches.forEach(match => match.forEach(matchNode => matchNode.tile.type = 'empty'));
+    
+    return hasMatches;
 }
 
 const dropNewTiles = board => {
@@ -177,7 +214,7 @@ const dropNewTiles = board => {
                     node.tile.row = newNode.tile.row;
                 } else {
                     node.tile.type = getRandomType();
-                    node.tile.row = (TILE_SIZE * -1) - TILE_SIZE * node.tile.row;
+                    node.tile.row = node.tile.row - GAME_SIZE;
                 }
 
                 setTimeout(() => {
@@ -190,6 +227,29 @@ const dropNewTiles = board => {
         })
         if(emptyCount === 0) break; 
     }
+
+    return new Promise(res => {
+        setTimeout(res, FALLING_SPEED * 1000 * 2);
+    })
+}
+
+const gameLoop = () => {
+    switch(state.current) {
+        case STATES.DROP:
+            state.current = STATES.DROPPING;
+            dropNewTiles(board)
+                .then(() => state.current = STATES.MATCH);
+            break;
+        case STATES.MATCH:
+            const hasMatches = matchBoard(board);
+            if(hasMatches) state.current = STATES.DROP;
+            else state.current = STATES.INPUT;
+            break;
+        case STATES.INPUT:
+        default:
+            break;
+    }
+    window.requestAnimationFrame(gameLoop)
 }
 
 const board = Array(GAME_SIZE).fill(0).map((n, row) => Array(GAME_SIZE).fill(0).map((m, column) => makeNode(row, column, row * GAME_SIZE + column)))
@@ -197,18 +257,5 @@ const board = Array(GAME_SIZE).fill(0).map((n, row) => Array(GAME_SIZE).fill(0).
 printBoard(board);
 
 document.addEventListener('keyup', e => {
-    if(e.which === 32) {
-        switch (STATE) {
-            case STATES.DROP:
-                dropNewTiles(board);
-                STATE = STATES.MATCH;
-                break;
-            case STATES.MATCH:
-                matchBoard(board);
-                STATE = STATES.DROP;
-                break;
-            default:
-                break;
-        }
-    }
+    if(e.which === 32) window.requestAnimationFrame(gameLoop);
 })
