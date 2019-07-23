@@ -49,7 +49,6 @@ const makeTile = (type, index, row, column) => {
     element.style.setProperty('--x', `${column * TILE_SIZE}px`)
 
     let animate = false;
-    let isAnimating = false;
     let animationDuration = (row + 1 / GAME_SIZE) * FALLING_SPEED;
     let selected = false;
 
@@ -60,45 +59,12 @@ const makeTile = (type, index, row, column) => {
 
     return {
         element,
-        isAnimating,
+        animationDuration,
         selected,
-        get animate(){
-            return animate;
-        },
-        set animate(shouldAnimate) {
-            if(shouldAnimate) {
-                element.style.transitionDuration = `${animationDuration}s`;
-            } else {
-                element.style.transitionDuration = '0s';
-            }
-            animate = shouldAnimate;
-        },
-        set type(newType) {
-            type = newType;
-            element.dataset.tileType = newType;
-        },
-        get type() {
-            return type;
-        },
-        get row(){
-            return row;
-        },
-        set row(newRow) {
-            animationDuration = ((Math.abs(row - newRow) + 1) / GAME_SIZE) * FALLING_SPEED;
-            row = newRow;
-            element.style.setProperty('--y', `${newRow * TILE_SIZE}px`);
-            isAnimating = true;
-            setTimeout(() => {
-                isAnimating = false;
-            }, animationDuration);
-        },
-        get column(){
-            return column;
-        },
-        set column(newColumn) {
-            column = newColumn;
-            element.style.setProperty('--x', `${newColumn * TILE_SIZE}px`);
-        },
+        animate,
+        type,
+        row,
+        column
     }
 }
 
@@ -195,42 +161,93 @@ const matchBoard = board => {
     return hasMatches;
 }
 
+const dropTile = (tile, fromRow, toRow) => {
+    setTileAnimate(tile, false);
+    setTilePosition(tile, fromRow);
+
+    return new Promise(animateResolver => {
+        setTimeout(() => {
+            setTileAnimate(tile, true);
+            setTileAnimationDuration(tile, toRow);
+            setTilePosition(tile, toRow);
+            animateResolver();
+        }, 0);
+    })
+    .then(() => new Promise(animationDoneResolver => setTimeout(animationDoneResolver, tile.animationDuration * 1000)))
+}
+
+const setTileAnimationDuration = (tile, newRow) => {
+    const animationDuration = ((Math.abs(tile.row - newRow || 0) + 1) / GAME_SIZE) * FALLING_SPEED;
+    return Object.assign(tile, {
+        animationDuration
+    })
+}
+
+const setTileAnimate = (tile, shouldAnimate) => {
+    if(shouldAnimate) {
+        tile.element.style.transitionDuration = `${tile.animationDuration}s`;
+    } else {
+        tile.element.style.transitionDuration = '0s';
+    }
+    return Object.assign(tile, {
+        animate: shouldAnimate
+    })
+}
+
+const setTileType = (tile, toType) => {
+    tile.element.dataset.tileType = toType;
+    return Object.assign(tile, {
+        type: toType
+    });
+}
+
+const setTilePosition = (tile, row, column) => {
+    row = row !== null && row !== undefined ? row : tile.row;
+    column = column !== null && column !== undefined ? column : tile.column;
+
+    tile.element.style.setProperty('--y', `${row * TILE_SIZE}px`);
+    tile.element.style.setProperty('--x', `${column * TILE_SIZE}px`);
+
+    return Object.assign(tile, {
+        row,
+        column
+    })
+}
+
+const swapTiles = (oneNode, anotherNode) => {
+    const oneTile = oneNode.tile;
+    oneNode.tile = anotherNode.tile;
+    anotherNode.tile = oneTile;
+}
+
 const dropNewTiles = board => {
     // Reverse the board. Start from bottom row
     const boardCopy = [...board.map(column => [...column])];
+    const droppingTiles = [];
+
     while(true) {
         let emptyCount = 0;
         iterateNodes(boardCopy.reverse(), node => {
             if(node.tile.type === 'empty') {
                 const newNode = getClosestAboveNonEmptyNode(node, board);
                 const originRow = node.tile.row;
-                node.tile.animate = false;
-
                 if(newNode) {
                     const newType = newNode.tile.type;
-
-                    newNode.tile.type = node.tile.type;
-                    node.tile.type = newType;
-                    node.tile.row = newNode.tile.row;
+                    setTileType(newNode.tile, node.tile.type);
+                    setTileType(node.tile, newType);
+                    droppingTiles.push(dropTile(node.tile, newNode.tile.row, originRow))
                 } else {
-                    node.tile.type = getRandomType();
-                    node.tile.row = node.tile.row - GAME_SIZE;
+                    setTileType(node.tile, getRandomType());
+                    // node.tile.row = node.tile.row - GAME_SIZE;
+                    droppingTiles.push(dropTile(node.tile, node.tile.row - (GAME_SIZE - 1), originRow))
                 }
-
-                setTimeout(() => {
-                    node.tile.animate = true;
-                    node.tile.row = originRow;
-                }, 0);
-
                 emptyCount++;
             }
         })
         if(emptyCount === 0) break; 
     }
 
-    return new Promise(res => {
-        setTimeout(res, FALLING_SPEED * 1000 * 2);
-    })
+    return Promise.all(droppingTiles);
 }
 
 const gameLoop = () => {
