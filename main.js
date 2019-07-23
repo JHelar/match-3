@@ -26,7 +26,7 @@ let state = (() => {
             return current;
         },
         set current(newState) {
-            if(DEBUG) {
+            if (DEBUG) {
                 console.log(`------------------------`);
                 console.log('OLD STATE: %s', current);
                 console.log('NEW STATE: %s', newState);
@@ -38,7 +38,7 @@ let state = (() => {
 })()
 const DEBUG = false;
 
-const getRandomType = () => colors[(Math.random() * 4) | 0]; 
+const getRandomType = () => colors[(Math.random() * 4) | 0];
 
 const makeTile = (type, index, row, column) => {
     const element = tileTemplate.content.cloneNode(true).querySelector('.tile');
@@ -70,7 +70,7 @@ const makeTile = (type, index, row, column) => {
 
 const makeNode = (row, column, index) => {
     const tile = makeTile(getRandomType(), index, row, column);
-    
+
     return {
         index,
         tile
@@ -112,16 +112,16 @@ const getMatches = (node, board) => {
     }
     // Vertical
     // Check exit condition for column
-    if(node.tile.row + 2 < GAME_SIZE) {
+    if (node.tile.row + 2 < GAME_SIZE) {
         const matchColumn = [
             node,
             getNodeAt(node.index + 1 * GAME_SIZE, board),
             getNodeAt(node.index + 2 * GAME_SIZE, board)
         ]
-        if(matchColumn.reduce(isMatch(node), true)) {
+        if (matchColumn.reduce(isMatch(node), true)) {
             const fourthNode = getNodeAt(node.index + 3 * GAME_SIZE, board);
             const fifthNode = getNodeAt(node.index + 4 * GAME_SIZE, board);
-            
+
             if (fourthNode && fourthNode.tile.column === node.tile.column && [...matchColumn, fourthNode].reduce(isMatch(node), true)) {
                 matchColumn.push(fourthNode);
                 if (fifthNode && fifthNode.tile.column === node.tile.column && [...matchColumn, fifthNode].reduce(isMatch(node), true)) {
@@ -138,8 +138,8 @@ const getMatches = (node, board) => {
 
 const getClosestAboveNonEmptyNode = (node, board) => {
     let nextNode = getNodeAt(node.index - GAME_SIZE, board) || undefined;
-    if(nextNode && nextNode.tile.type === 'empty') return getClosestAboveNonEmptyNode(nextNode, board);
-    else if(nextNode) {
+    if (nextNode && nextNode.tile.type === 'empty') return getClosestAboveNonEmptyNode(nextNode, board);
+    else if (nextNode) {
         return nextNode;
     } else {
         return undefined;
@@ -157,23 +157,22 @@ const matchBoard = board => {
     const hasMatches = matches.size > 0;
 
     matches.forEach(match => match.forEach(matchNode => matchNode.tile.type = 'empty'));
-    
+
     return hasMatches;
 }
 
 const dropTile = (tile, fromRow, toRow) => {
     setTileAnimate(tile, false);
     setTilePosition(tile, fromRow);
+    setTileAnimationDuration(tile, toRow);
 
-    return new Promise(animateResolver => {
-        setTimeout(() => {
-            setTileAnimate(tile, true);
-            setTileAnimationDuration(tile, toRow);
-            setTilePosition(tile, toRow);
-            animateResolver();
-        }, 0);
-    })
-    .then(() => new Promise(animationDoneResolver => setTimeout(animationDoneResolver, tile.animationDuration * 1000)))
+    setTimeout(() => {
+        setTileAnimate(tile, true);
+        setTilePosition(tile, toRow);
+        if (DEBUG) console.log(`TILE: ${JSON.stringify(tile)}`)
+    }, 0);
+
+    return new Promise(animationDoneResolver => setTimeout(animationDoneResolver, tile.animationDuration * 1000))
 }
 
 const setTileAnimationDuration = (tile, newRow) => {
@@ -184,7 +183,7 @@ const setTileAnimationDuration = (tile, newRow) => {
 }
 
 const setTileAnimate = (tile, shouldAnimate) => {
-    if(shouldAnimate) {
+    if (shouldAnimate) {
         tile.element.style.transitionDuration = `${tile.animationDuration}s`;
     } else {
         tile.element.style.transitionDuration = '0s';
@@ -220,18 +219,32 @@ const swapTiles = (oneNode, anotherNode) => {
     anotherNode.tile = oneTile;
 }
 
+const isSwapValid = (thisNode, withNode, board) => {
+    const indexDiff = Math.abs(thisNode.index - withNode.index);
+    if (
+        indexDiff === 1 || indexDiff === GAME_SIZE &&
+        (
+            (thisNode.tile.column === 0 || thisNode.tile.column === GAME_SIZE - 1) && !(withNode.tile.column === 0 || withNode.tile.column === GAME_SIZE - 1))
+    ) {
+
+    }
+    swapTiles(thisNode, withNode);
+    const matches = [...getMatches(thisNode, board), ...getMatches(withNode, board)];
+    return matches.length > 0;
+}
+
 const dropNewTiles = board => {
     // Reverse the board. Start from bottom row
     const boardCopy = [...board.map(column => [...column])];
     const droppingTiles = [];
 
-    while(true) {
+    while (true) {
         let emptyCount = 0;
         iterateNodes(boardCopy.reverse(), node => {
-            if(node.tile.type === 'empty') {
+            if (node.tile.type === 'empty') {
                 const newNode = getClosestAboveNonEmptyNode(node, board);
                 const originRow = node.tile.row;
-                if(newNode) {
+                if (newNode) {
                     const newType = newNode.tile.type;
                     setTileType(newNode.tile, node.tile.type);
                     setTileType(node.tile, newType);
@@ -244,14 +257,14 @@ const dropNewTiles = board => {
                 emptyCount++;
             }
         })
-        if(emptyCount === 0) break; 
+        if (emptyCount === 0) break;
     }
 
     return Promise.all(droppingTiles);
 }
 
 const gameLoop = () => {
-    switch(state.current) {
+    switch (state.current) {
         case STATES.DROP:
             state.current = STATES.DROPPING;
             dropNewTiles(board)
@@ -259,7 +272,7 @@ const gameLoop = () => {
             break;
         case STATES.MATCH:
             const hasMatches = matchBoard(board);
-            if(hasMatches) state.current = STATES.DROP;
+            if (hasMatches) state.current = STATES.DROP;
             else state.current = STATES.INPUT;
             break;
         case STATES.INPUT:
@@ -274,5 +287,5 @@ const board = Array(GAME_SIZE).fill(0).map((n, row) => Array(GAME_SIZE).fill(0).
 printBoard(board);
 
 document.addEventListener('keyup', e => {
-    if(e.which === 32) window.requestAnimationFrame(gameLoop);
+    if (e.which === 32) window.requestAnimationFrame(gameLoop);
 })
