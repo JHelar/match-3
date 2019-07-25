@@ -1,6 +1,7 @@
 :root {
     --game-size: 8;
     --tile-size: 50px;
+    --node-size: 58px;
 
     --tile-main-color: transparent;
     --tile-secondary-color: transparent;
@@ -19,10 +20,20 @@ body {
 }
 
 #game {
-    display: block;
     position: relative;
-    width: calc(var(--game-size) * var(--tile-size));
-    height: calc(var(--game-size) * var(--tile-size));
+    display: grid;
+    grid-template-columns: repeat(var(--game-size), var(--node-size));
+    grid-template-rows: repeat(var(--game-size), var(--node-size));
+}
+
+.node {
+    position: relative;
+    z-index: 1;
+}
+
+.node[data-node-selected=true] {
+    border-radius: 10px;
+    animation: selected 1s linear forwards infinite;
 }
 
 .tile {
@@ -36,13 +47,18 @@ body {
     box-sizing: border-box;
 
     position: absolute;
+
+    z-index: 2;
+
     left: var(--x);
     top: var(--y);
 
     width: var(--tile-size);
     height: var(--tile-size);
 
-    transition: top 0s ease;
+    pointer-events: none;
+
+    transition: top 0s ease, left 0s ease;
 }
 
 .tile[data-tile-type=red] {
@@ -69,27 +85,14 @@ body {
     opacity: 0;
 }
 
-.tile[data-tile-selected=true]::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-
-    box-shadow: 0 0 0 0 white;
-
-    animation: selected 1s linear forwards infinite;
-}
-
 @keyframes selected {
     0% {
-        box-shadow: 0 0 0 0 white;
+        background-color: rgba(255, 255, 255, 0);
     }
     50% {
-        box-shadow: 0 0 40px 0 white;
+        background-color: rgba(255, 255, 255, 1);
     }
     100% {
-        box-shadow: 0 0 0 0 white;
+        background-color: rgba(255, 255, 255, 0);
     }
 }

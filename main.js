@@ -1,8 +1,12 @@
 const gameElement = document.getElementById('game');
 const tileTemplate = document.getElementById('tile');
+const nodeTemplate = document.getElementById('node');
 
 const GAME_SIZE = 8;
 const TILE_SIZE = 50;
+const NODE_SIZE = 58;
+const TILE_OFFSET = (NODE_SIZE - TILE_SIZE) / 2;
+
 const FALLING_SPEED = 1;
 const SWAP_SPEED = 0.5;
 
@@ -23,6 +27,20 @@ const STATES = {
     SWAPPING: 'SWAPPING'
 }
 
+const DEBUG = false;
+
+console.debug = (() => {
+    let messageCounter = 0;
+    return function () {
+        if (DEBUG) {
+            console.log(`-----------${messageCounter}----------`);
+            console.log(...arguments);
+            console.log(`-----------${messageCounter}----------`);
+            messageCounter++;
+        }
+    }
+})()
+
 let state = (() => {
     let current = STATES.MATCH;
     return {
@@ -30,17 +48,11 @@ let state = (() => {
             return current;
         },
         set current(newState) {
-            if (DEBUG) {
-                console.log(`------------------------`);
-                console.log('OLD STATE: %s', current);
-                console.log('NEW STATE: %s', newState);
-                console.log(`------------------------`);
-            }
+            console.debug('OLD STATE: %s \nNEW STATE: %s', current, newState);
             current = newState;
         }
     }
 })()
-const DEBUG = true;
 
 const getRandomType = () => colors[(Math.random() * 4) | 0];
 
@@ -49,19 +61,15 @@ const makeTile = (type, index, row, column) => {
     element.dataset.tileType = type;
     element.innerHTML = DEBUG ? `${index}, (${column}, ${row})` : '';
 
-    element.style.setProperty('--y', `${row * TILE_SIZE}px`);
-    element.style.setProperty('--x', `${column * TILE_SIZE}px`)
+    element.style.setProperty('--y', `${row * TILE_SIZE + (TILE_OFFSET + row * TILE_OFFSET * 2)}px`);
+    element.style.setProperty('--x', `${column * TILE_SIZE + (TILE_OFFSET + column * TILE_OFFSET * 2)}px`);
 
     let animate = false;
     let animationDuration = (row + 1 / GAME_SIZE) * FALLING_SPEED;
-    let selected = false;
-
-    element.addEventListener('click', tileClickHandler(index))
 
     return {
         element,
         animationDuration,
-        selected,
         animate,
         type,
         row,
@@ -71,20 +79,38 @@ const makeTile = (type, index, row, column) => {
 
 const makeNode = (row, column, index) => {
     const tile = makeTile(getRandomType(), index, row, column);
+    const element = nodeTemplate.content.cloneNode(true).querySelector('.node');
+    element.dataset.nodeIndex = index;
 
     return {
         index,
-        tile
+        tile,
+        element,
+        selected: false
     }
 }
 
 
-const printBoard = board => {
-    board.forEach(nodeRow => nodeRow.forEach(node => gameElement.appendChild(node.tile.element)));
+const setupGame = board => {
+    iterateNodes(board, node => {
+        gameElement.appendChild(node.element);
+        gameElement.appendChild(node.tile.element);
+    })
+    gameElement.addEventListener('click', e => {
+        if(state.current === STATES.INPUT) {
+            if (e.target.classList.contains('node')) {
+                const nodeIndex = e.target.dataset.nodeIndex;
+                if (nodeIndex !== undefined) selectNode(nodeIndex | 0, board);
+            }
+        }
+    })
+
+    // Start gameLoop
+    window.requestAnimationFrame(gameLoop);
 }
 
 const getNodeAt = (index, board) => board.reduce((node, nodeRow) => node || nodeRow.find(n => n.index === index), undefined)
-const getSelectedNode = board => board.reduce((node, nodeRow) => node || nodeRow.find(n => n.tile.selected), undefined);
+const getSelectedNode = board => board.reduce((node, nodeRow) => node || nodeRow.find(n => n.selected), undefined);
 
 const isMatch = node => (matched, matchNode) => !matched || !matchNode ? false : matchNode.tile.type === node.tile.type;
 
@@ -163,37 +189,87 @@ const matchBoard = board => {
     return hasMatches;
 }
 
-const tileClickHandler = nodeIndex => evt => {
-    if(state.current === STATES.INPUT) {
-        const selectedNode = getSelectedNode(board);
-        const thisNode = getNodeAt(nodeIndex, board);
-    
-        if(selectedNode && isSwapValid(thisNode, selectedNode, board)) {
-            toggleTileSelected(selectedNode.index, board);
+const getPotentialNodes = (node, board) => {
+    const right1 = getNodeAt(node.index + 1, board);
+    const right2 = getNodeAt(node.index + 2, board);
+    const left1 = getNodeAt(node.index - 1, board);
+    const left2 = getNodeAt(node.index - 2, board);
+    const up1 = getNodeAt(node.index - GAME_SIZE, board);
+    const up2 = getNodeAt(node.index - GAME_SIZE * 2, board);
+    const down1 = getNodeAt(node.index + GAME_SIZE, board);
+    const down2 = getNodeAt(node.index + GAME_SIZE * 2, board);
 
-            const selectedTileOrigin = {...selectedNode.tile};
-            const thisTileOrigin = {...thisNode.tile};
+    return [
+        node,
+        right1,
+        right2,
+        left1,
+        left2,
+        up1,
+        up2,
+        down1,
+        down2
+    ]
+    .filter(pNode => pNode ? true : false)
+}
 
-            swapTiles(selectedNode, thisNode); // Swap tiles.
+const selectNode = (nodeIndex, board) => {
+    const selectedNode = getSelectedNode(board);
+    const thisNode = getNodeAt(nodeIndex, board);
+
+    if (selectedNode && isSwapValid(thisNode, selectedNode, board)) {
+        toggleNodeSelected(selectedNode);
+
+        console.debug(`SWAP VALID: ${JSON.stringify(thisNode)} <=> ${JSON.stringify(selectedNode)}`);
+
+        // Swap the tiles
+        swapTiles(selectedNode, thisNode);
+
+        // Potential matches for both nodes
+        const selectedPotentialNodes = getPotentialNodes(selectedNode, board);
+        const thisPotentialNodes = getPotentialNodes(thisNode, board);
+        
+        const matches = [
+            ...selectedPotentialNodes,
+            ...thisPotentialNodes
+        ]
+        .reduce((acc, pNode) => acc.concat(getMatches(pNode, board)), [])
+
+        // Check matches
+        console.debug(`MATCHES FOR SWAP: ${[...matches].length}`);
+        if (matches.length) {
+            // Make a postion swap
+            const thisTileCopy = {
+                ...thisNode.tile
+            }
+
+            setTileAnimationDuration(selectedNode.tile, null, SWAP_SPEED);
+            setTileAnimate(selectedNode.tile, true);
+
+            setTileAnimationDuration(thisNode.tile, null, SWAP_SPEED);
+            setTileAnimate(thisNode.tile, true);
+
+            setTilePosition(thisNode.tile, selectedNode.tile.row, selectedNode.tile.column);
+            setTilePosition(selectedNode.tile, thisTileCopy.row, thisTileCopy.column);
+
+            // Set state to swapping
+            state.current = STATES.SWAPPING
+
+            // Wait until animation done. Then set state
             setTimeout(() => {
-                setTileAnimate(selectedNode.tile, true);
-                setTileAnimationDuration(selectedNode.tile, null, SWAP_SPEED);
-
-                setTileAnimate(thisNode.tile, true);
-                setTileAnimationDuration(thisNode.tile, null, SWAP_SPEED);
-
-                setTilePosition(selectedNode.tile, thisTileOrigin.row, thisTileOrigin.column);
-                setTilePosition(thisNode.tile, selectedTileOrigin.row, selectedTileOrigin.column);
-
-                state.current = STATES.SWAPPING;
-            }, 0);
-            setTimeout(() => {
-                state.current = STATES.MATCH; // Change state to match the swapped tiles.
+                state.current = STATES.MATCH
             }, SWAP_SPEED * 1000);
+
         } else {
-            if(selectedNode) toggleTileSelected(selectedNode.index, board);
-            toggleTileSelected(nodeIndex, board)
+            // No matches for the swap, select the new node.
+            toggleNodeSelected(thisNode);
+
+            // Swap back the tiles
+            swapTiles(selectedNode, thisNode);
         }
+    } else {
+        if (selectedNode) toggleNodeSelected(selectedNode);
+        toggleNodeSelected(thisNode)
     }
 }
 
@@ -205,7 +281,7 @@ const dropTile = (tile, fromRow, toRow) => {
     setTimeout(() => {
         setTileAnimate(tile, true);
         setTilePosition(tile, toRow);
-        if (DEBUG) console.log(`TILE: ${JSON.stringify(tile)}`)
+        console.debug(`TILE: ${JSON.stringify(tile)}`)
     }, 0);
 
     return new Promise(animationDoneResolver => setTimeout(() => {
@@ -214,21 +290,18 @@ const dropTile = (tile, fromRow, toRow) => {
     }, tile.animationDuration * 1000))
 }
 
-const toggleTileSelected = (nodeIndex, board) => {
-    const node = getNodeAt(nodeIndex, board);
-
-    if(node) {
-        Object.assign(node.tile, {
-            selected: !node.tile.selected
+const toggleNodeSelected = node => {
+    if (node) {
+        Object.assign(node, {
+            selected: !node.selected
         })
 
-        node.tile.element.dataset.tileSelected = node.tile.selected ? 'true' : 'false';
+        node.element.dataset.nodeSelected = node.selected ? 'true' : 'false';
+        if (node.selected) console.debug(`NODE SELECTED: ${JSON.stringify(node)}`)
 
-        if(DEBUG) console.log(`NODE SELECTED: ${JSON.stringify(node)}`)
-
-        return node.tile;
+        return node;
     }
-    
+
     return undefined;
 }
 
@@ -261,8 +334,8 @@ const setTilePosition = (tile, row, column) => {
     row = row !== null && row !== undefined ? row : tile.row;
     column = column !== null && column !== undefined ? column : tile.column;
 
-    tile.element.style.setProperty('--y', `${row * TILE_SIZE}px`);
-    tile.element.style.setProperty('--x', `${column * TILE_SIZE}px`);
+    tile.element.style.setProperty('--y', `${row * TILE_SIZE + (TILE_OFFSET + row * TILE_OFFSET * 2)}px`);
+    tile.element.style.setProperty('--x', `${column * TILE_SIZE + (TILE_OFFSET + column * TILE_OFFSET * 2)}px`);
 
     return Object.assign(tile, {
         row,
@@ -271,31 +344,36 @@ const setTilePosition = (tile, row, column) => {
 }
 
 const swapTiles = (oneNode, anotherNode) => {
-    const oneTile = oneNode.tile;
-    oneNode.tile = anotherNode.tile;
-    anotherNode.tile = oneTile;
+    const oneTile = {
+        ...oneNode.tile
+    };
+    Object.assign(oneNode.tile, anotherNode.tile);
+    Object.assign(anotherNode.tile, oneTile);
 }
 
-const isSwapValid = (thisNode, withNode, board) => {
-    if(!thisNode || !withNode) return false;
+const checkEdgeCase = (thisNode, withNode) => {
+    return thisNode.tile.column === 0 && withNode.tile.column !== GAME_SIZE - 1 ||
+    thisNode.tile.column === GAME_SIZE - 1 && withNode.tile.column !== 0;
+}
+
+const isSwapValid = (thisNode, withNode) => {
+    if (!thisNode || !withNode) return false;
 
     const indexDiff = Math.abs(thisNode.index - withNode.index);
     const isThisNodeEdge = thisNode.tile.column === 0 || thisNode.tile.column === GAME_SIZE - 1;
     const isWithNodeEdge = withNode.tile.column === 0 || withNode.tile.column === GAME_SIZE - 1;
+
+    const thisNodeEdgeCase = checkEdgeCase(thisNode, withNode);
+    const withNodeEdgeCase = checkEdgeCase(withNode, thisNode);
+
     if (
         (indexDiff === 1 || indexDiff === GAME_SIZE) &&
         (
             (!isThisNodeEdge && !isWithNodeEdge) || // None of them are edges
-            (isThisNodeEdge && !isWithNodeEdge) || // If thisNode is on edge withNode cannot
-            (!isThisNodeEdge && isWithNodeEdge) // If withNode is on edge thisNode cannot
+            (thisNodeEdgeCase || withNodeEdgeCase) // Both edge cases need to be true
         )
     ) {
-        // Swap the tiles.
-        swapTiles(thisNode, withNode);
-        const matches = [...getMatches(thisNode, board), ...getMatches(withNode, board)];
-        // Swap the tiles back.
-        swapTiles(thisNode, withNode);
-        return matches.length > 0;
+        return true;
     }
     return false;
 }
@@ -304,13 +382,13 @@ const isDeadlocked = board => {
     let isDeadlocked = true;
 
     iterateNodes(board, node => {
-        if(isDeadlocked) {
+        if (isDeadlocked) {
             isDeadlocked = ![
-                getNodeAt(node.index + 1, board), // Horizontal node
-                getNodeAt(node.index + 8, board) // Vertical node
-            ]
-            .map(swapNode => isSwapValid(node, swapNode, board))
-            .some(canSwap => canSwap);
+                    getNodeAt(node.index + 1, board), // Horizontal node
+                    getNodeAt(node.index + 8, board) // Vertical node
+                ]
+                .map(swapNode => isSwapValid(node, swapNode, board))
+                .some(canSwap => canSwap);
         }
     })
     return isDeadlocked;
@@ -356,7 +434,7 @@ const gameLoop = () => {
         case STATES.MATCH:
             const hasMatches = matchBoard(board);
             if (hasMatches) state.current = STATES.DROP;
-            else if(isDeadlocked(board)) state.current = STATES.SHUFFLE;
+            else if (isDeadlocked(board)) state.current = STATES.SHUFFLE;
             else state.current = STATES.INPUT
             break;
         case STATES.INPUT:
@@ -368,8 +446,4 @@ const gameLoop = () => {
 
 const board = Array(GAME_SIZE).fill(0).map((n, row) => Array(GAME_SIZE).fill(0).map((m, column) => makeNode(row, column, row * GAME_SIZE + column)))
 
-printBoard(board);
-
-document.addEventListener('keyup', e => {
-    if (e.which === 32) window.requestAnimationFrame(gameLoop);
-})
+setupGame(board);
