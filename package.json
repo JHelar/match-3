@@ -1,0 +1,13 @@
+{
+  "name": "match-3",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "watch-ts": "tsc -w",
+    "watch-js": "webpack ./compiled/main.js -o ./dist/main.bundle.js -w"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

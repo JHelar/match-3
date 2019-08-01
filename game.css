@@ -2,6 +2,7 @@
     --game-size: 8;
     --tile-size: 50px;
     --node-size: 58px;
+    --border-radius: 10px;
 
     --tile-main-color: transparent;
     --tile-secondary-color: transparent;
@@ -32,7 +33,7 @@ body {
 }
 
 .node[data-node-selected=true] {
-    border-radius: 10px;
+    border-radius: var(--border-radius);
     animation: selected 1s linear forwards infinite;
 }
 
@@ -42,7 +43,7 @@ body {
     background-color: var(--tile-main-color);
 
     border: 4px solid transparent;
-    border-radius: 10px;
+    border-radius: var(--border-radius);
 
     box-sizing: border-box;
 
@@ -58,7 +59,7 @@ body {
 
     pointer-events: none;
 
-    transition: top 0s ease, left 0s ease;
+    transition: all 0s ease;
 }
 
 .tile[data-tile-type=red] {
@@ -82,6 +83,28 @@ body {
 }
 
 .tile[data-tile-type=empty] {
+    opacity: 0;
+}
+
+.tile[data-tile-special=striped]::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    background-image: repeating-linear-gradient(-45deg, white 8px, transparent 16px);
+
+    border-radius: var(--border-radius);
+}
+
+.tile[data-tile-explode] {
+    transform: scale(1);
+}
+
+.tile[data-tile-explode=true] {
+    transform: scale(2);
     opacity: 0;
 }
 
