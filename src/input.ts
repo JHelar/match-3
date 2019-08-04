@@ -1,5 +1,5 @@
-import { getNodeAt, getSelectedNode } from "./helpers";
-import { Board, Node, STATES } from "./types";
+import { getNodeAt, getSelectedNode, getNodeRowNumber, getNodeColumnNumber } from "./helpers";
+import { Board, Node, STATES, UserClickResult } from "./types";
 import { isSwapValid, isSwapMatching } from "./swapping";
 import { swapTiles, toggleNodeSelected } from "./node";
 import { swapTile } from "./tile";
@@ -25,7 +25,7 @@ const trySwapTiles = (thisNode: Node, withNode: Node | undefined, board: Board) 
     }
 }
 
-export const makeHandleUserClick = (board: Board) => (e: Event) => {
+export const makeHandleUserClick = (board: Board) => (e: Event): UserClickResult => {
     if(e.target && (e.target as HTMLElement).classList.contains('node')) {
         const nodeElement = e.target as HTMLElement;
         const nodeIndex = nodeElement.dataset.nodeIndex;
@@ -35,6 +35,14 @@ export const makeHandleUserClick = (board: Board) => (e: Event) => {
                 const selectedNode = getSelectedNode(board);
                 const didSwap = trySwapTiles(node, selectedNode, board);
                 if(didSwap && selectedNode) {
+                    // Is the swap comming from above or from the side?
+                    const selectedNodeRow = getNodeRowNumber(selectedNode);
+                    const nodeRow = getNodeRowNumber(node);
+                    
+                    const selectedNodeColumn = getNodeColumnNumber(selectedNode);
+                    const nodeColumn = getNodeColumnNumber(node);
+
+
                     // Set state to swapping
                     STATE.CURRENT = STATES.SWAPPING;
 
@@ -45,11 +53,22 @@ export const makeHandleUserClick = (board: Board) => (e: Event) => {
                         })
 
                     toggleNodeSelected(selectedNode);
+
+                    return {
+                        didSwap: true,
+                        horizontalSwap: selectedNodeColumn !== nodeColumn,
+                        verticalSwap: selectedNodeRow !== nodeRow,
+                        selectedNode: node,
+                        prevSelectedNode: selectedNode
+                    }
                 } else {
                     if (selectedNode) toggleNodeSelected(selectedNode);
                     toggleNodeSelected(node);
                 }
             }
         }
+    }
+    return {
+        didSwap: false
     }
 }

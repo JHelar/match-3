@@ -86,7 +86,7 @@ body {
     opacity: 0;
 }
 
-.tile[data-tile-special=striped]::after {
+.tile[data-tile-special^=striped-]::after {
     content: '';
     position: absolute;
     top: 0;
@@ -94,9 +94,16 @@ body {
     left: 0;
     right: 0;
 
-    background-image: repeating-linear-gradient(-45deg, white 8px, transparent 16px);
-
+    
     border-radius: var(--border-radius);
+}
+
+.tile[data-tile-special=striped-horizontal]::after {
+    background-image: repeating-linear-gradient(180deg, white, white 5px, transparent 5px, transparent 15px);
+}
+
+.tile[data-tile-special=striped-vertical]::after {
+    background-image: repeating-linear-gradient(90deg, white, white 5px, transparent 5px, transparent 15px);
 }
 
 .tile[data-tile-explode] {

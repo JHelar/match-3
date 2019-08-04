@@ -6,6 +6,9 @@ import { gameElement } from "./elements";
 import { makeHandleUserClick } from "./input";
 export default () => {
     const board = makeBoard();
+    let userClickResult = {
+        didSwap: false
+    };
     const gameLoop = () => {
         switch (STATE.CURRENT) {
             case STATES.DROP:
@@ -15,7 +18,7 @@ export default () => {
                 break;
             case STATES.MATCH:
                 STATE.CURRENT = STATES.MATCHING;
-                matchBoard(board)
+                matchBoard(board, userClickResult)
                     .then(hasMatches => {
                     if (hasMatches)
                         STATE.CURRENT = STATES.DROP;
@@ -42,7 +45,7 @@ export default () => {
     const handleUserClick = makeHandleUserClick(board);
     gameElement.addEventListener('click', e => {
         if (STATE.CURRENT === STATES.INPUT) {
-            handleUserClick(e);
+            userClickResult = handleUserClick(e);
         }
     });
     return {

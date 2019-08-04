@@ -1,11 +1,11 @@
-import { Node, Board, MatchResult, TileSpecial } from './types';
+import { Node, Board, MatchResult, TileSpecial, UserClickResult } from './types';
 import { GAME_SIZE } from './constants';
 import { getNodeAt, filterUndefined } from './helpers';
 
 const isMatch = (node: Node) => (matched: boolean, matchNode: Node | undefined) => !matched || !matchNode ? false : matchNode.tile.type === node.tile.type;
 
 export const getMatches = (node: Node, board: Board): MatchResult => {
-    const matches: MatchResult = []
+    const matches: MatchResult = [];
     // Horizontal
     // Check exit condition for row
     if (node.tile.column + 2 < GAME_SIZE) {

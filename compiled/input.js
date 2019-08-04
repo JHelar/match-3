@@ -1,4 +1,4 @@
-import { getNodeAt, getSelectedNode } from "./helpers";
+import { getNodeAt, getSelectedNode, getNodeRowNumber, getNodeColumnNumber } from "./helpers";
 import { STATES } from "./types";
 import { isSwapValid, isSwapMatching } from "./swapping";
 import { swapTiles, toggleNodeSelected } from "./node";
@@ -32,6 +32,11 @@ export const makeHandleUserClick = (board) => (e) => {
                 const selectedNode = getSelectedNode(board);
                 const didSwap = trySwapTiles(node, selectedNode, board);
                 if (didSwap && selectedNode) {
+                    // Is the swap comming from above or from the side?
+                    const selectedNodeRow = getNodeRowNumber(selectedNode);
+                    const nodeRow = getNodeRowNumber(node);
+                    const selectedNodeColumn = getNodeColumnNumber(selectedNode);
+                    const nodeColumn = getNodeColumnNumber(node);
                     // Set state to swapping
                     STATE.CURRENT = STATES.SWAPPING;
                     // Wait until animation done. Then set state
@@ -40,6 +45,13 @@ export const makeHandleUserClick = (board) => (e) => {
                         STATE.CURRENT = STATES.MATCH;
                     });
                     toggleNodeSelected(selectedNode);
+                    return {
+                        didSwap: true,
+                        horizontalSwap: selectedNodeColumn !== nodeColumn,
+                        verticalSwap: selectedNodeRow !== nodeRow,
+                        selectedNode: node,
+                        prevSelectedNode: selectedNode
+                    };
                 }
                 else {
                     if (selectedNode)
@@ -49,5 +61,8 @@ export const makeHandleUserClick = (board) => (e) => {
             }
         }
     }
+    return {
+        didSwap: false
+    };
 };
 //# sourceMappingURL=input.js.map

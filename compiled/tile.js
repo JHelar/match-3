@@ -19,25 +19,27 @@ export const makeTile = (row, column, type = 'empty') => {
         type,
         row,
         column,
-        special: undefined
+        special: undefined,
+        killed: false
     };
 };
 export const explodeTile = (tile) => {
-    tile.element.dataset.tileExplode = 'true';
+    setTileKilled(tile, true);
     setTileAnimate(tile, true);
     setTileAnimationDuration(tile, undefined, EXPLODE_SPEED);
+    tile.element.dataset.tileExplode = 'true';
     return new Promise(res => {
         setTimeout(() => {
             setTileAnimate(tile, false);
             setTileSpecial(tile);
             tile.element.dataset.tileExplode = 'false';
-            tile.type = 'empty';
+            setTileType(tile, 'empty');
             res();
         }, EXPLODE_SPEED * 1000);
     });
 };
 export const setTileAnimationDuration = (tile, newRow, duration) => {
-    const animationDuration = duration || ((Math.abs(tile.row - newRow || 0) + 1) / GAME_SIZE) * FALLING_SPEED;
+    const animationDuration = duration || ((Math.abs(tile.row - (newRow || 0)) + 1) / GAME_SIZE) * FALLING_SPEED;
     return Object.assign(tile, {
         animationDuration
     });
@@ -57,6 +59,11 @@ export const setTileType = (tile, toType) => {
     tile.element.dataset.tileType = toType;
     return Object.assign(tile, {
         type: toType
+    });
+};
+export const setTileKilled = (tile, killed) => {
+    return Object.assign(tile, {
+        killed
     });
 };
 export const setTileSpecial = (tile, special) => {

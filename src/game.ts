@@ -1,4 +1,4 @@
-import { STATES, Game } from "./types";
+import { STATES, Game, UserClickResult } from "./types";
 import { STATE } from "./constants";
 import { dropNewTiles, isDeadlocked, makeBoard, matchBoard } from "./board";
 import { iterateNodes } from "./helpers";
@@ -7,6 +7,10 @@ import { makeHandleUserClick } from "./input";
 
 export default (): Game => {
     const board = makeBoard();
+    let userClickResult: UserClickResult = {
+        didSwap: false
+    }
+
     const gameLoop = () => {
         switch (STATE.CURRENT) {
             case STATES.DROP:
@@ -16,7 +20,7 @@ export default (): Game => {
                 break;
             case STATES.MATCH:
                 STATE.CURRENT = STATES.MATCHING;
-                matchBoard(board)
+                matchBoard(board, userClickResult)
                     .then(hasMatches => {
                         if (hasMatches) STATE.CURRENT = STATES.DROP;
                         else if (isDeadlocked(board)) STATE.CURRENT = STATES.SHUFFLE;
@@ -42,7 +46,7 @@ export default (): Game => {
 
     gameElement.addEventListener('click', e => {
         if(STATE.CURRENT === STATES.INPUT) {
-            handleUserClick(e);
+            userClickResult = handleUserClick(e);
         }
     })
 

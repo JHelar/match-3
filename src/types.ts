@@ -1,5 +1,5 @@
 export type TileType = 'red' | 'green' | 'yellow' | 'blue' | 'empty';
-export type TileSpecial = 'striped' | 'wrapped' | 'super';
+export type TileSpecial = 'striped-horizontal' | 'striped-vertical' | 'striped' | 'wrapped' | 'super';
 export type Board = Node[][];
 export type MatchResult = MatchSet[];
 export type NodeIterationCallback = (node: Node, rowIndex: number, columnIndex: number) => void;
@@ -30,9 +30,10 @@ export interface Tile {
     animationDuration: number;
     animate: boolean;
     type: TileType;
-    special: TileSpecial | undefined;
+    special?: TileSpecial;
     row: number;
     column: number;
+    killed: boolean;
 }
 
 export interface Node {
@@ -40,4 +41,12 @@ export interface Node {
     tile: Tile;
     element: HTMLElement;
     selected: boolean;
+}
+
+export interface UserClickResult {
+    selectedNode?: Node;
+    prevSelectedNode?: Node;
+    verticalSwap?: boolean;
+    horizontalSwap?: boolean;
+    didSwap: boolean;
 }
