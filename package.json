@@ -5,9 +5,14 @@
   "main": "main.js",
   "scripts": {
     "watch-ts": "tsc -w",
-    "watch-js": "webpack ./compiled/main.js -o ./dist/main.bundle.js -w"
+    "watch-js": "webpack ./compiled/main.js -o ./dist/main.bundle.js -w",
+    "build": "tsc && webpack ./compiled/main.js -o ./dist/main.bundle.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^3.5.3",
+    "webapack": "^1.0.0"
+  }
 }
